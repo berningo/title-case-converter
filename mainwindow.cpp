@@ -368,21 +368,6 @@ void MainWindow::onAbout()
                        "<p>License: GPL v3</p>");
 }
 
-void MainWindow::loadStyleSheet()
-{
-    QString styleSheet;
-
-    styleSheet =
-        "QGroupBox { color: #000000; }"
-        "QTextEdit { background-color: #ffffff; color: #000000; }"
-        "QPushButton { background-color: #f0f0f0; color: #000000; }"
-        "QLabel { color: #000000; }"
-        "QMenuBar { background-color: #f0f0f0; color: #000000; }"
-        "QStatusBar { color: #000000; background-color: #f0f0f0; }";
-
-    qApp->setStyleSheet(styleSheet);
-}
-
 void MainWindow::onStatusBarMessage(const QString &message, int timeout)
 {
     statusBar()->showMessage(message, timeout);

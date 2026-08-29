@@ -70,7 +70,6 @@ private:
     void createStatusBar();
     void connectSignals();
     void updateWordCount();
-    void loadStyleSheet();
     QString getCurrentTheme() const;
 };
 
