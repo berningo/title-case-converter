@@ -7,10 +7,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Qt6 finden - OHNE feste Pfade!
+# Find Qt6 without fixed paths
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 
-# Quellcodedateien
+# Source files
 set(SOURCES
     main.cpp
     mainwindow.cpp
@@ -20,10 +20,10 @@ set(HEADERS
     mainwindow.h
 )
 
-# Ausführbare Datei
+# Executable file
 add_executable(title_case_converter ${SOURCES} ${HEADERS})
 
-# Qt-Bibliotheken verknüpfen
+# Link Qt Libs
 target_link_libraries(title_case_converter
     Qt6::Core
     Qt6::Widgets
@@ -33,11 +33,11 @@ target_include_directories(title_case_converter PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# Qt-MOC
+# Qt MOC
 qt6_wrap_cpp(MOC_SOURCES ${HEADERS})
 target_sources(title_case_converter PRIVATE ${MOC_SOURCES})
 
-# macOS-spezifisch
+# For MacOS
 if(APPLE)
     set_target_properties(title_case_converter PROPERTIES
         MACOSX_BUNDLE TRUE
