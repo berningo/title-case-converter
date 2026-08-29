@@ -185,7 +185,7 @@ void MainWindow::updateWordCount()
 {
     QString text = inputEdit->toPlainText();
     QStringList words = text.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-    wordCountLabel->setText(QString("Wörter: %1").arg(words.count()));
+    wordCountLabel->setText(QString("Word count: %1").arg(words.count()));
 }
 
 bool MainWindow::isMinorWord(const QString &word) const
