@@ -6,21 +6,6 @@
 #include <QRegularExpression>
 #include <QtGlobal>
 
-static QString toLowerQt(const QString &str)
-{
-    return str.toLower();
-}
-
-static QString toTitleCaseWordQt(const QString &word)
-{
-    if (word.isEmpty())
-        return word;
-
-    QString result = word.toLower();
-    result[0] = result[0].toUpper();
-    return result;
-}
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -177,8 +162,7 @@ void MainWindow::connectSignals()
     connect(inputEdit, &QTextEdit::textChanged, this, [this]()
             {
                 this->updateWordCount();
-                this->onAutoConvert(inputEdit->toPlainText());
-            });
+                this->onAutoConvert(inputEdit->toPlainText()); });
 }
 
 void MainWindow::updateWordCount()
@@ -190,12 +174,16 @@ void MainWindow::updateWordCount()
 
 bool MainWindow::isMinorWord(const QString &word) const
 {
-    static const QVector<QString> minorWords = {
+    // APA-7 Title Case
+    static const QSet<QString> minorWords = {
+        // Articles
         "a", "an", "the",
-        "and", "but", "or", "for", "nor",
-        "on", "at", "to", "by", "in", "for", "of", "with",
-        "up", "off", "over", "under", "through", "during",
-        "without", "within"};
+
+        // Coordinating conjunctions
+        "and", "but", "for", "nor", "or", "so", "yet",
+
+        // Short prepositions (3 letters or fewer)
+        "as", "at", "by", "in", "of", "off", "on", "per", "to", "up", "via"};
 
     QString lower = word.toLower();
     return minorWords.contains(lower);
@@ -206,7 +194,7 @@ QString MainWindow::toTitleCaseWord(const QString &word) const
     if (word.isEmpty())
         return word;
 
-    QString result = word.toLower();
+    QString result = word;
     result[0] = result[0].toUpper();
     return result;
 }
@@ -360,8 +348,8 @@ void MainWindow::onAbout()
 {
     QMessageBox::about(this, "About Title Case Converter",
                        "<h2>Title Case Converter</h2>"
-                       "<p>Version 1.0.0</p>"
-                       "<p>A tool to convert text to <b>Title Case</b> "
+                       "<p>Version 0.8</p>"
+                       "<p>A tool to convert text to <b>APA-7 Title Case</b> "
                        "according to English rules.</p>"
                        "<p>Developed with Qt6 und C++17</p>"
                        "<p>Developed by Oliver Berning</p>"
