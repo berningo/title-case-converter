@@ -4,10 +4,15 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/include/qt6/**"
+                "/usr/include/qt6/**",
+                "/usr/include/wx-3.2/**",
+                "/usr/include/wx-3.2/wx/**",
+                "/usr/include/wx-3.2/wx/gtk/**",
+                "/usr/include/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
             "cStandard": "c17",
             "cppStandard": "gnu++20",
             "intelliSenseMode": "linux-gcc-x64"

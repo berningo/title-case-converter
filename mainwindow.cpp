@@ -1,371 +1,270 @@
 #include "mainwindow.h"
-#include <QFile>
-#include <QTextStream>
-#include <QDateTime>
-#include <QDebug>
-#include <QRegularExpression>
-#include <QtGlobal>
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
+#include <wx/button.h>
+#include <wx/clipbrd.h>
+#include <wx/file.h>
+#include <wx/filedlg.h>
+#include <wx/font.h>
+#include <wx/menu.h>
+#include <wx/msgdlg.h>
+#include <wx/sizer.h>
+#include <wx/statbox.h>
+#include <wx/stattext.h>
+#include <wx/textctrl.h>
+#include <wx/tokenzr.h>
+
+#include <set>
+
+namespace
 {
-    setupUI();
-    createMenuBar();
-    createStatusBar();
-    connectSignals();
+enum
+{
+    ID_Convert = wxID_HIGHEST + 1,
+    ID_Copy,
+    ID_Reset,
+    ID_Open,
+    ID_Save
+};
 
-    resize(700, 500);
-    setMinimumSize(500, 400);
-
-    setWindowTitle("Title Case Converter");
-
-    onStatusBarMessage("Ready", 2000);
+wxArrayString SplitWords(const wxString &text)
+{
+    wxArrayString words;
+    wxStringTokenizer tokenizer(text, " \t\r\n", wxTOKEN_STRTOK);
+    while (tokenizer.HasMoreTokens())
+        words.Add(tokenizer.GetNextToken());
+    return words;
 }
 
-MainWindow::~MainWindow()
+bool IsUppercaseAbbreviation(const wxString &word)
 {
+    bool hasLetter = false;
+    bool allUppercase = true;
+
+    for (const wxUniChar character : word) {
+        if (!wxIsalpha(character))
+            continue;
+        hasLetter = true;
+        if (!wxIsupper(character)) {
+            allUppercase = false;
+            break;
+        }
+    }
+
+    return hasLetter && allUppercase;
+}
+} // namespace
+
+wxBEGIN_EVENT_TABLE(MainWindow, wxFrame)
+    EVT_BUTTON(ID_Convert, MainWindow::OnConvert)
+    EVT_BUTTON(ID_Copy, MainWindow::OnCopy)
+    EVT_BUTTON(ID_Reset, MainWindow::OnClear)
+    EVT_BUTTON(ID_Open, MainWindow::OnLoadFile)
+    EVT_BUTTON(ID_Save, MainWindow::OnSaveFile)
+    EVT_TEXT(wxID_ANY, MainWindow::OnInputChanged)
+    EVT_MENU(ID_Open, MainWindow::OnLoadFile)
+    EVT_MENU(ID_Save, MainWindow::OnSaveFile)
+    EVT_MENU(wxID_COPY, MainWindow::OnCopy)
+    EVT_MENU(ID_Reset, MainWindow::OnClear)
+    EVT_MENU(wxID_EXIT, MainWindow::OnExit)
+    EVT_MENU(wxID_ABOUT, MainWindow::OnAbout)
+wxEND_EVENT_TABLE()
+
+MainWindow::MainWindow()
+    : wxFrame(nullptr, wxID_ANY, "Title Case Converter", wxDefaultPosition,
+              wxSize(700, 500), wxDEFAULT_FRAME_STYLE)
+{
+    SetMinSize(wxSize(500, 400));
+
+    auto *fileMenu = new wxMenu();
+    fileMenu->Append(ID_Open, "&Open...\tCtrl-O", "Load text from file");
+    fileMenu->Append(ID_Save, "&Save...\tCtrl-S", "Save converted text to file");
+    fileMenu->AppendSeparator();
+    fileMenu->Append(wxID_EXIT, "E&xit\tCtrl-Q", "Exit application");
+
+    auto *editMenu = new wxMenu();
+    editMenu->Append(wxID_COPY, "&Copy\tCtrl-C", "Copy converted text to clipboard");
+    editMenu->Append(ID_Reset, "&Reset\tDelete", "Reset all fields");
+
+    auto *helpMenu = new wxMenu();
+    helpMenu->Append(wxID_ABOUT, "&About", "About this application");
+
+    auto *menuBar = new wxMenuBar();
+    menuBar->Append(fileMenu, "&File");
+    menuBar->Append(editMenu, "&Edit");
+    menuBar->Append(helpMenu, "&Help");
+    SetMenuBar(menuBar);
+
+    auto *mainSizer = new wxBoxSizer(wxVERTICAL);
+    auto *inputBox = new wxStaticBoxSizer(wxVERTICAL, this, "Input");
+    inputEdit = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                               wxDefaultSize, wxTE_MULTILINE);
+    inputEdit->SetFont(wxFontInfo(12).Family(wxFONTFAMILY_TELETYPE));
+    inputEdit->SetHint("Enter text here...");
+    inputBox->Add(inputEdit, 1, wxEXPAND | wxALL, 5);
+    mainSizer->Add(inputBox, 1, wxEXPAND | wxALL, 10);
+
+    auto *buttonSizer = new wxBoxSizer(wxHORIZONTAL);
+    auto addButton = [this, buttonSizer](int id, const wxString &label,
+                                         const wxString &help) {
+        auto *button = new wxButton(this, id, label);
+        button->SetToolTip(help);
+        buttonSizer->Add(button, 0, wxRIGHT, 10);
+    };
+    addButton(ID_Open, "Load", "Load text from file");
+    addButton(ID_Save, "Save", "Save converted text to file");
+    buttonSizer->AddStretchSpacer();
+    addButton(ID_Convert, "Convert", "Convert text to title case");
+    addButton(ID_Reset, "Reset", "Reset all fields");
+    buttonSizer->AddStretchSpacer();
+    addButton(ID_Copy, "Copy", "Copy converted text to clipboard");
+    mainSizer->Add(buttonSizer, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+
+    auto *outputBox = new wxStaticBoxSizer(wxVERTICAL, this, "Output");
+    outputEdit = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                                wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
+    outputEdit->SetFont(wxFontInfo(12).Family(wxFONTFAMILY_TELETYPE));
+    outputBox->Add(outputEdit, 1, wxEXPAND | wxALL, 5);
+    mainSizer->Add(outputBox, 1, wxEXPAND | wxLEFT | wxRIGHT, 10);
+
+    wordCountLabel = new wxStaticText(this, wxID_ANY, "Word count: 0");
+    mainSizer->Add(wordCountLabel, 0, wxALIGN_RIGHT | wxALL, 10);
+    SetSizer(mainSizer);
+    CreateStatusBar();
+    ShowStatus("Ready");
 }
 
-void MainWindow::setupUI()
+bool MainWindow::IsMinorWord(const wxString &word) const
 {
-    QWidget *centralWidget = new QWidget(this);
-    setCentralWidget(centralWidget);
-
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setSpacing(10);
-    mainLayout->setContentsMargins(20, 20, 20, 20);
-
-    QGroupBox *inputGroup = new QGroupBox("Input", this);
-    QVBoxLayout *inputLayout = new QVBoxLayout(inputGroup);
-
-    inputEdit = new QTextEdit(this);
-    inputEdit->setPlaceholderText("Enter text here...");
-    inputEdit->setFont(QFont("Courier", 12));
-    inputEdit->setAcceptRichText(false);
-    inputEdit->setMinimumHeight(120);
-    inputEdit->setTabChangesFocus(true);
-    inputLayout->addWidget(inputEdit);
-
-    mainLayout->addWidget(inputGroup);
-
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
-    buttonLayout->setSpacing(10);
-
-    loadButton = new QPushButton("📂 Load", this);
-    loadButton->setToolTip("Load text from file");
-    buttonLayout->addWidget(loadButton);
-
-    saveButton = new QPushButton("💾 Save", this);
-    saveButton->setToolTip("Save converted text to file");
-    buttonLayout->addWidget(saveButton);
-
-    buttonLayout->addStretch();
-
-    convertButton = new QPushButton("🔄 Convert", this);
-    convertButton->setToolTip("Convert text to title case");
-    convertButton->setDefault(true);
-    convertButton->setMinimumWidth(120);
-    buttonLayout->addWidget(convertButton);
-
-    clearButton = new QPushButton("🗑️ Reset", this);
-    clearButton->setToolTip("Reset all fields");
-    buttonLayout->addWidget(clearButton);
-
-    buttonLayout->addStretch();
-
-    copyButton = new QPushButton("📋 Copy", this);
-    copyButton->setToolTip("Copy converted text to clipboard");
-    copyButton->setMinimumWidth(120);
-    buttonLayout->addWidget(copyButton);
-
-    mainLayout->addLayout(buttonLayout);
-
-    QGroupBox *outputGroup = new QGroupBox("Output", this);
-    QVBoxLayout *outputLayout = new QVBoxLayout(outputGroup);
-
-    outputEdit = new QTextEdit(this);
-    outputEdit->setReadOnly(true);
-    outputEdit->setFont(QFont("Courier", 12));
-    outputEdit->setAcceptRichText(false);
-    outputEdit->setMinimumHeight(120);
-    outputLayout->addWidget(outputEdit);
-
-    mainLayout->addWidget(outputGroup);
-
-    wordCountLabel = new QLabel("Word count: 0", this);
-    wordCountLabel->setAlignment(Qt::AlignRight);
-    mainLayout->addWidget(wordCountLabel);
-}
-
-void MainWindow::createMenuBar()
-{
-    QMenuBar *menuBar = this->menuBar();
-
-    fileMenu = menuBar->addMenu("&File");
-
-    loadAction = new QAction("&Open...", this);
-    loadAction->setShortcut(QKeySequence::Open);
-    loadAction->setStatusTip("Load text from file");
-    fileMenu->addAction(loadAction);
-
-    saveAction = new QAction("&Save...", this);
-    saveAction->setShortcut(QKeySequence::Save);
-    saveAction->setStatusTip("Save converted text to file");
-    fileMenu->addAction(saveAction);
-
-    fileMenu->addSeparator();
-
-    exitAction = new QAction("&Exit", this);
-    exitAction->setShortcut(QKeySequence::Quit);
-    exitAction->setStatusTip("Exit application");
-    fileMenu->addAction(exitAction);
-
-    editMenu = menuBar->addMenu("&Edit");
-
-    copyAction = new QAction("&Copy", this);
-    copyAction->setShortcut(QKeySequence::Copy);
-    copyAction->setStatusTip("Copy converted text to clipboard");
-    editMenu->addAction(copyAction);
-
-    clearAction = new QAction("&Reset", this);
-    clearAction->setShortcut(QKeySequence::Delete);
-    clearAction->setStatusTip("Reset all fields");
-    editMenu->addAction(clearAction);
-
-    helpMenu = menuBar->addMenu("&Help");
-
-    aboutAction = new QAction("&About", this);
-    aboutAction->setStatusTip("About this application");
-    helpMenu->addAction(aboutAction);
-}
-
-void MainWindow::createStatusBar()
-{
-    statusBar()->showMessage("Ready");
-}
-
-void MainWindow::connectSignals()
-{
-    connect(convertButton, &QPushButton::clicked, this, &MainWindow::onConvert);
-    connect(copyButton, &QPushButton::clicked, this, &MainWindow::onCopy);
-    connect(clearButton, &QPushButton::clicked, this, &MainWindow::onClear);
-    connect(loadButton, &QPushButton::clicked, this, &MainWindow::onLoadFile);
-    connect(saveButton, &QPushButton::clicked, this, &MainWindow::onSaveFile);
-
-    connect(loadAction, &QAction::triggered, this, &MainWindow::onLoadFile);
-    connect(saveAction, &QAction::triggered, this, &MainWindow::onSaveFile);
-    connect(exitAction, &QAction::triggered, this, &MainWindow::onExit);
-    connect(copyAction, &QAction::triggered, this, &MainWindow::onCopy);
-    connect(clearAction, &QAction::triggered, this, &MainWindow::onClear);
-    connect(aboutAction, &QAction::triggered, this, &MainWindow::onAbout);
-
-    connect(inputEdit, &QTextEdit::textChanged, this, [this]()
-            {
-                this->updateWordCount();
-                this->onAutoConvert(inputEdit->toPlainText()); });
-}
-
-void MainWindow::updateWordCount()
-{
-    QString text = inputEdit->toPlainText();
-    QStringList words = text.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-    wordCountLabel->setText(QString("Word count: %1").arg(words.count()));
-}
-
-bool MainWindow::isMinorWord(const QString &word) const
-{
-    // APA-7 Title Case
-    static const QSet<QString> minorWords = {
-        // Articles
-        "a", "an", "the",
-
-        // Coordinating conjunctions
-        "and", "but", "for", "nor", "or", "so", "yet",
-
-        // Short prepositions (3 letters or fewer)
+    static const std::set<wxString> minorWords = {
+        "a", "an", "the", "and", "but", "for", "nor", "or", "so", "yet",
         "as", "at", "by", "in", "of", "off", "on", "per", "to", "up", "via"};
-
-    QString lower = word.toLower();
-    return minorWords.contains(lower);
+    return minorWords.count(word.Lower()) != 0;
 }
 
-QString MainWindow::toTitleCaseWord(const QString &word) const
+wxString MainWindow::TitleCase(const wxString &input) const
 {
-    if (word.isEmpty())
-        return word;
+    wxArrayString words = SplitWords(input);
+    if (words.IsEmpty())
+        return wxEmptyString;
+    for (size_t i = 0; i < words.size(); ++i) {
+        const wxString originalWord = words[i];
+        words[i].MakeLower();
 
-    QString result = word;
-    result[0] = result[0].toUpper();
-    return result;
-}
-
-QString MainWindow::titleCase(const QString &input) const
-{
-    if (input.trimmed().isEmpty())
-    {
-        return QString();
-    }
-
-    QStringList words = input.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-
-    if (words.isEmpty())
-    {
-        return QString();
-    }
-
-    words[0] = toTitleCaseWord(words[0]);
-
-    for (int i = 1; i < words.size(); ++i)
-    {
-        if (!isMinorWord(words[i]))
-        {
-            words[i] = toTitleCaseWord(words[i]);
+        if (originalWord.length() > 1 &&
+            IsUppercaseAbbreviation(originalWord) &&
+            !IsMinorWord(words[i])) {
+            words[i] = originalWord;
+            continue;
         }
-        else
-        {
-            words[i] = words[i].toLower();
-        }
-    }
 
-    return words.join(" ");
+        if (i == 0 || !IsMinorWord(words[i]))
+            words[i][0] = wxToupper(words[i][0]);
+    }
+    return wxJoin(words, ' ');
 }
 
-void MainWindow::onConvert()
+void MainWindow::UpdateWordCount()
 {
-    QString input = inputEdit->toPlainText();
+    wordCountLabel->SetLabel(wxString::Format("Word count: %lu", static_cast<unsigned long>(SplitWords(inputEdit->GetValue()).size())));
+}
 
-    if (input.trimmed().isEmpty())
-    {
-        QMessageBox::warning(this, "Error",
-                             "Please enter a text!");
-        onStatusBarMessage("Error: No text entered", 3000);
+void MainWindow::ShowStatus(const wxString &message)
+{
+    SetStatusText(message);
+}
+
+void MainWindow::OnInputChanged(wxCommandEvent &event)
+{
+    if (event.GetEventObject() == inputEdit) {
+        UpdateWordCount();
+        const wxString text = inputEdit->GetValue();
+        wxString trimmed = text;
+        trimmed.Trim(true).Trim(false);
+        outputEdit->ChangeValue(trimmed.IsEmpty() ? wxString() : TitleCase(text));
+    }
+    event.Skip();
+}
+
+void MainWindow::OnConvert(wxCommandEvent &)
+{
+    const wxString input = inputEdit->GetValue();
+    if (SplitWords(input).IsEmpty()) {
+        wxMessageBox("Please enter a text!", "Error", wxOK | wxICON_WARNING, this);
+        ShowStatus("Error: No text entered");
         return;
     }
-
-    QString result = titleCase(input);
-    outputEdit->setPlainText(result);
-
-    onStatusBarMessage(QString("✅ Conversion successful (%1 words)")
-                           .arg(input.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts).count()),
-                       3000);
+    outputEdit->SetValue(TitleCase(input));
+    ShowStatus(wxString::Format("Conversion successful (%lu words)", static_cast<unsigned long>(SplitWords(input).size())));
 }
 
-void MainWindow::onCopy()
+void MainWindow::OnCopy(wxCommandEvent &)
 {
-    QString text = outputEdit->toPlainText();
-
-    if (text.isEmpty())
-    {
-        QMessageBox::warning(this, "Error",
-                             "No text to copy!");
-        onStatusBarMessage("Error: No text to copy", 3000);
+    const wxString text = outputEdit->GetValue();
+    if (text.IsEmpty()) {
+        wxMessageBox("No text to copy!", "Error", wxOK | wxICON_WARNING, this);
+        ShowStatus("Error: No text to copy");
         return;
     }
-
-    QClipboard *clipboard = QApplication::clipboard();
-    clipboard->setText(text);
-
-    onStatusBarMessage("✅ Text copied", 3000);
+    if (wxTheClipboard->Open()) {
+        wxTheClipboard->SetData(new wxTextDataObject(text));
+        wxTheClipboard->Close();
+        ShowStatus("Text copied");
+    }
 }
 
-void MainWindow::onClear()
+void MainWindow::OnClear(wxCommandEvent &)
 {
-    inputEdit->clear();
-    outputEdit->clear();
-    updateWordCount();
-    onStatusBarMessage("🧹 All reset", 2000);
+    inputEdit->Clear();
+    outputEdit->Clear();
+    UpdateWordCount();
+    ShowStatus("All reset");
 }
 
-void MainWindow::onLoadFile()
+void MainWindow::OnLoadFile(wxCommandEvent &)
 {
-    QString fileName = QFileDialog::getOpenFileName(this,
-                                                    "Open text file",
-                                                    QDir::homePath(),
-                                                    "Text file (*.txt);;All files (*.*)");
-
-    if (fileName.isEmpty())
+    wxFileDialog dialog(this, "Open text file", wxEmptyString, wxEmptyString,
+                        "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                        wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    if (dialog.ShowModal() != wxID_OK)
         return;
-
-    QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        QMessageBox::critical(this, "Error",
-                              QString("Cannot open file:\n%1").arg(file.errorString()));
-        onStatusBarMessage("Error on opening file", 3000);
+    wxFile file(dialog.GetPath());
+    wxString content;
+    if (!file.IsOpened() || !file.ReadAll(&content)) {
+        wxMessageBox("Cannot open file:\n" + dialog.GetPath(), "Error", wxOK | wxICON_ERROR, this);
         return;
     }
-
-    QTextStream in(&file);
-    QString content = in.readAll();
-    file.close();
-
-    inputEdit->setPlainText(content);
-    updateWordCount();
-    onStatusBarMessage(QString("📂 File opened: %1").arg(fileName), 3000);
+    inputEdit->SetValue(content);
+    ShowStatus("File opened: " + dialog.GetPath());
 }
 
-void MainWindow::onSaveFile()
+void MainWindow::OnSaveFile(wxCommandEvent &)
 {
-    QString text = outputEdit->toPlainText();
-    if (text.isEmpty())
-    {
-        QMessageBox::warning(this, "Error",
-                             "No text to save!");
-        onStatusBarMessage("Error: No text to save", 3000);
+    const wxString text = outputEdit->GetValue();
+    if (text.IsEmpty()) {
+        wxMessageBox("No text to save!", "Error", wxOK | wxICON_WARNING, this);
+        ShowStatus("Error: No text to save");
         return;
     }
-
-    QString fileName = QFileDialog::getSaveFileName(this,
-                                                    "Save output",
-                                                    QDir::homePath() + "/title_case_output.txt",
-                                                    "Text files (*.txt);;All files (*.*)");
-
-    if (fileName.isEmpty())
+    wxFileDialog dialog(this, "Save output", wxEmptyString, "title_case_output.txt",
+                        "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    if (dialog.ShowModal() != wxID_OK)
         return;
-
-    QFile file(fileName);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
-    {
-        QMessageBox::critical(this, "Error",
-                              QString("Cannot save file:\n%1").arg(file.errorString()));
-        onStatusBarMessage("Error on file saving", 3000);
+    wxFile file(dialog.GetPath(), wxFile::write);
+    if (!file.IsOpened() || file.Write(text) != text.length()) {
+        wxMessageBox("Cannot save file:\n" + dialog.GetPath(), "Error", wxOK | wxICON_ERROR, this);
         return;
     }
-
-    QTextStream out(&file);
-    out << text;
-    file.close();
-
-    onStatusBarMessage(QString("💾 Saved: %1").arg(fileName), 3000);
+    ShowStatus("Saved: " + dialog.GetPath());
 }
 
-void MainWindow::onExit()
+void MainWindow::OnExit(wxCommandEvent &)
 {
-    qApp->quit();
+    Close(true);
 }
 
-void MainWindow::onAbout()
+void MainWindow::OnAbout(wxCommandEvent &)
 {
-    QMessageBox::about(this, "About Title Case Converter",
-                       "<h2>Title Case Converter</h2>"
-                       "<p>Version 0.8</p>"
-                       "<p>A tool to convert text to <b>APA-7 Title Case</b> "
-                       "according to English rules.</p>"
-                       "<p>Developed with Qt6 und C++17</p>"
-                       "<p>Developed by Oliver Berning</p>"
-                       "<p>License: GPL v3</p>");
-}
-
-void MainWindow::onStatusBarMessage(const QString &message, int timeout)
-{
-    statusBar()->showMessage(message, timeout);
-}
-
-void MainWindow::onAutoConvert(const QString &text)
-{
-    if (!text.trimmed().isEmpty())
-    {
-        QString result = titleCase(text);
-        outputEdit->setPlainText(result);
-    }
+    wxMessageBox("Title Case Converter\n\nVersion 0.8\nA tool to convert text to APA-7 Title Case.\n\nDeveloped with wxWidgets and C++17\nDeveloped by Oliver Berning\nLicense: GPL v3",
+                 "About Title Case Converter", wxOK | wxICON_INFORMATION, this);
 }

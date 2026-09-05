@@ -1,76 +1,38 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QMainWindow>
-#include <QTextEdit>
-#include <QPushButton>
-#include <QLabel>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGroupBox>
-#include <QStatusBar>
-#include <QMenuBar>
-#include <QMenu>
-#include <QAction>
-#include <QClipboard>
-#include <QMessageBox>
-#include <QFileDialog>
-#include <QTextStream>
-#include <QString>
-#include <QStringList>
-#include <QVector>
-#include <QApplication>
+#include <wx/frame.h>
+#include <wx/string.h>
 
-class MainWindow : public QMainWindow
+class wxCommandEvent;
+class wxStaticText;
+class wxTextCtrl;
+
+class MainWindow final : public wxFrame
 {
-    Q_OBJECT
-
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
-
-private slots:
-    void onConvert();
-    void onCopy();
-    void onClear();
-    void onLoadFile();
-    void onSaveFile();
-    void onExit();
-    void onAbout();
-    void onStatusBarMessage(const QString &message, int timeout = 3000);
-    void onAutoConvert(const QString &text);
+    MainWindow();
 
 private:
-    QTextEdit *inputEdit;
-    QTextEdit *outputEdit;
-    QPushButton *convertButton;
-    QPushButton *copyButton;
-    QPushButton *clearButton;
-    QPushButton *loadButton;
-    QPushButton *saveButton;
-    QLabel *wordCountLabel;
+    void OnConvert(wxCommandEvent &event);
+    void OnCopy(wxCommandEvent &event);
+    void OnClear(wxCommandEvent &event);
+    void OnLoadFile(wxCommandEvent &event);
+    void OnSaveFile(wxCommandEvent &event);
+    void OnExit(wxCommandEvent &event);
+    void OnAbout(wxCommandEvent &event);
+    void OnInputChanged(wxCommandEvent &event);
+    void UpdateWordCount();
 
-    QMenu *fileMenu;
-    QMenu *editMenu;
-    QMenu *helpMenu;
+    bool IsMinorWord(const wxString &word) const;
+    wxString TitleCase(const wxString &input) const;
+    void ShowStatus(const wxString &message);
 
-    QAction *loadAction;
-    QAction *saveAction;
-    QAction *exitAction;
-    QAction *copyAction;
-    QAction *clearAction;
-    QAction *aboutAction;
+    wxTextCtrl *inputEdit = nullptr;
+    wxTextCtrl *outputEdit = nullptr;
+    wxStaticText *wordCountLabel = nullptr;
 
-    bool isMinorWord(const QString &word) const;
-    QString toTitleCaseWord(const QString &word) const;
-    QString titleCase(const QString &input) const;
-
-    void setupUI();
-    void createMenuBar();
-    void createStatusBar();
-    void connectSignals();
-    void updateWordCount();
-    QString getCurrentTheme() const;
+    wxDECLARE_EVENT_TABLE();
 };
 
-#endif // MAINWINDOW_H
+#endif

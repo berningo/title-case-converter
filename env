@@ -1,6 +1,0 @@
-#!/usr/bin/bash
-
-export CMAKE_PREFIX_PATH=/home/linuxbrew/.linuxbrew/Cellar/qtbase/6.11.1
-export Qt6_DIR=/home/linuxbrew/.linuxbrew/Cellar/qtbase/6.11.1/lib/cmake/Qt6
-export QT_QPA_PLATFORM_PLUGIN_PATH=/home/linuxbrew/.linuxbrew/Cellar/qtbase/6.11.1/share/qt/plugins
-export QT_PLUGIN_PATH=/home/linuxbrew/.linuxbrew/Cellar/qtbase/6.11.1/share/qt/plugins
