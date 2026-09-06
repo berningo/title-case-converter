@@ -61,10 +61,10 @@ wxBEGIN_EVENT_TABLE(MainWindow, wxFrame)
     EVT_BUTTON(ID_Open, MainWindow::OnLoadFile)
     EVT_BUTTON(ID_Save, MainWindow::OnSaveFile)
     EVT_TEXT(wxID_ANY, MainWindow::OnInputChanged)
-    EVT_MENU(ID_Open, MainWindow::OnLoadFile)
-    EVT_MENU(ID_Save, MainWindow::OnSaveFile)
+    EVT_MENU(wxID_OPEN, MainWindow::OnLoadFile)
+    EVT_MENU(wxID_SAVE, MainWindow::OnSaveFile)
     EVT_MENU(wxID_COPY, MainWindow::OnCopy)
-    EVT_MENU(ID_Reset, MainWindow::OnClear)
+    EVT_MENU(wxID_RESET, MainWindow::OnClear)
     EVT_MENU(wxID_EXIT, MainWindow::OnExit)
     EVT_MENU(wxID_ABOUT, MainWindow::OnAbout)
 wxEND_EVENT_TABLE()
@@ -76,14 +76,14 @@ MainWindow::MainWindow()
     SetMinSize(wxSize(500, 400));
 
     auto *fileMenu = new wxMenu();
-    fileMenu->Append(ID_Open, "&Open...\tCtrl-O", "Load text from file");
-    fileMenu->Append(ID_Save, "&Save...\tCtrl-S", "Save converted text to file");
+    fileMenu->Append(wxID_OPEN, "&Open...\tCtrl-O", "Load text from file");
+    fileMenu->Append(wxID_SAVE, "&Save...\tCtrl-S", "Save converted text to file");
     fileMenu->AppendSeparator();
     fileMenu->Append(wxID_EXIT, "E&xit\tCtrl-Q", "Exit application");
 
     auto *editMenu = new wxMenu();
     editMenu->Append(wxID_COPY, "&Copy\tCtrl-C", "Copy converted text to clipboard");
-    editMenu->Append(ID_Reset, "&Reset\tDelete", "Reset all fields");
+    editMenu->Append(wxID_RESET, "&Reset\tDelete", "Reset all fields");
 
     auto *helpMenu = new wxMenu();
     helpMenu->Append(wxID_ABOUT, "&About", "About this application");
