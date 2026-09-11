@@ -16,6 +16,8 @@ set(HEADERS
     mainwindow.h
 )
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Executable file
 add_executable(title_case_converter ${SOURCES} ${HEADERS})
 
