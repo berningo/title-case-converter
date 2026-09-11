@@ -96,9 +96,10 @@ MainWindow::MainWindow()
 
     auto *mainSizer = new wxBoxSizer(wxVERTICAL);
     auto *inputBox = new wxStaticBoxSizer(wxVERTICAL, this, "Input");
+    auto fontSetting = wxFontInfo(14).Family(wxFONTFAMILY_MODERN);
     inputEdit = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
                                wxDefaultSize, wxTE_MULTILINE);
-    inputEdit->SetFont(wxFontInfo(12).Family(wxFONTFAMILY_TELETYPE));
+    inputEdit->SetFont(fontSetting);
     inputEdit->SetHint("Enter text here...");
     inputBox->Add(inputEdit, 1, wxEXPAND | wxALL, 5);
     mainSizer->Add(inputBox, 1, wxEXPAND | wxALL, 10);
@@ -122,7 +123,7 @@ MainWindow::MainWindow()
     auto *outputBox = new wxStaticBoxSizer(wxVERTICAL, this, "Output");
     outputEdit = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
                                 wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
-    outputEdit->SetFont(wxFontInfo(12).Family(wxFONTFAMILY_TELETYPE));
+    outputEdit->SetFont(fontSetting);
     outputBox->Add(outputEdit, 1, wxEXPAND | wxALL, 5);
     mainSizer->Add(outputBox, 1, wxEXPAND | wxLEFT | wxRIGHT, 10);
 
