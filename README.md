@@ -22,6 +22,12 @@ make -j$(nproc)
 
 Install the header files, the right precompiled developer libraries and the release DLLs (for the right compiler) from here: https://wxwidgets.org/downloads/
 
+Open the _Developer Powershell for VS 2022_, e.g.,
+
+```pwsh
+ & "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64
+```
+
 If you installed them under C:\Libraries\wxwidgets-3.3.3 then use this command in the Powershell:
 
 ```pwsh
